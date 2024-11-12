@@ -53,26 +53,31 @@ typedef struct
 
 typedef struct
 {
-    Card card[52];
+    Card* cards;      // Now a pointer to a dynamically allocated array of Cards
 } Deck;
 
 typedef struct
 {
-    Deck deck;
+    Deck* deck;
     Card dealerCards[2];
     double sumBetting;
 } Board;
 
 typedef struct
 {
-    Board board;
-    Player players[2];
+    Player* players;  // Pointer to a dynamically allocated array of Players
+    Board* board;
 } Game;
+
 
 void initializePlayer(Player* player);
 void initializeBoard(Board* board);
 void initializeDeck(Deck* deck);
 void shuffleDeck(Deck* deck);
+void freeGame(Game* game);
+
+void dealCards(Game* game);
+void printCards(Card* card);
 
 int main()
 {
@@ -81,30 +86,56 @@ int main()
 
 void initializePlayer(Player* player) {
     player->ChipSum = 250.0;
+    strcpy(player->name, "Default Name");  // Optional: set a default name
 }
 
 void initializeDeck(Deck* deck) {
+    deck->cards = malloc(52 * sizeof(Card));  // Allocate space for 52 cards
+    if (deck->cards == NULL) {
+        perror("Failed to allocate memory for deck cards");
+        exit(EXIT_FAILURE);
+    }
+
     SUIT suits[4] = {HEARTS, DIAMONDS, SPADES, CLUBS};
     VALUE values[13] = {ACE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING};
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 13; j++) {
             int index = i * 13 + j;
-            deck->card[index].Suit = suits[i];
-            deck->card[index].Value = values[j];
-
-            // Assign color based on suit
-            if (deck->card[index].Suit == HEARTS || deck->card[index].Suit == DIAMONDS) {
-                deck->card[index].Color = RED;
-            } else {
-                deck->card[index].Color = BLACK;
-            }
+            deck->cards[index].Suit = suits[i];
+            deck->cards[index].Value = values[j];
+            deck->cards[index].Color = (suits[i] == HEARTS || suits[i] == DIAMONDS) ? RED : BLACK;
         }
     }
 }
 
 void initializeBoard(Board* board) {
-    initializeDeck(&board->deck);
+    board->deck = malloc(sizeof(Deck));
+    if (board->deck == NULL) {
+        perror("Failed to allocate memory for deck");
+        exit(EXIT_FAILURE);
+    }
+    initializeDeck(board->deck);  // Initialize the deck within the board
+
+    board->sumBetting = 0.0;  // Initialize the betting sum to zero
+}
+
+void initializeGame(Game* game, int playerCount) {
+    game->board = malloc(sizeof(Board));
+    if (game->board == NULL) {
+        perror("Failed to allocate memory for board");
+        exit(EXIT_FAILURE);
+    }
+    initializeBoard(game->board);  // Initialize the board
+
+    game->players = malloc(playerCount * sizeof(Player));
+    if (game->players == NULL) {
+        perror("Failed to allocate memory for players");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < playerCount; i++) {
+        initializePlayer(&game->players[i]);
+    }
 }
 
 void shuffleDeck(Deck* deck) {
@@ -116,8 +147,33 @@ void shuffleDeck(Deck* deck) {
         int j = rand() % (i + 1);
 
         // Swap deck->card[i] with deck->card[j]
-        Card temp = deck->card[i];
-        deck->card[i] = deck->card[j];
-        deck->card[j] = temp;
+        Card temp = deck->cards[i];
+        deck->cards[i] = deck->cards[j];
+        deck->cards[j] = temp;
     }
 }
+
+void freeGame(Game* game) {
+    // Free the cards array in the deck
+    if (game->board->deck->cards != NULL) {
+        free(game->board->deck->cards);
+    }
+
+    // Free the deck itself
+    if (game->board->deck != NULL) {
+        free(game->board->deck);
+    }
+
+    // Free the board
+    if (game->board != NULL) {
+        free(game->board);
+    }
+
+    // Free the players array
+    if (game->players != NULL) {
+        free(game->players);
+    }
+}
+
+
+
