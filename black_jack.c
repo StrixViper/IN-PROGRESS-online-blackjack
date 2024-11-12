@@ -5,6 +5,8 @@
 #include <time.h>
 
 #define MAX_NAME_LEN 50
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
 
 typedef enum
 {
@@ -70,6 +72,12 @@ typedef struct
 } Game;
 
 
+// Map values and suits to their string representations
+const char* VALUE_NAMES[] = {"Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen", "King"};
+const char* SUIT_NAMES[] = {"Hearts", "Diamonds", "Spades", "Clubs"};
+const char* COLOR_NAMES[] = {"Red", "Black"};
+
+
 void initializePlayer(Player* player);
 void initializeBoard(Board* board);
 void initializeDeck(Deck* deck);
@@ -77,10 +85,26 @@ void shuffleDeck(Deck* deck);
 void freeGame(Game* game);
 
 void dealCards(Game* game);
+void RemoveFromDeck(Game* game,Card *card);
+void InsertToDeck(Game* game,Card *card);
+
 void printCards(Card* card);
 
-int main()
-{
+
+int main() {
+    // Create and initialize a red card (Ace of Hearts)
+    Card redCard = {ACE, HEARTS, RED};
+
+    // Create and initialize a black card (King of Spades)
+    Card blackCard = {KING, SPADES, BLACK};
+
+    // Test the printCards function with both cards
+    printf("Red Card:\n");
+    printCards(&redCard);
+
+    printf("\nBlack Card:\n");
+    printCards(&blackCard);
+
     return 0;
 }
 
@@ -175,5 +199,68 @@ void freeGame(Game* game) {
     }
 }
 
+void dealCards(Game* game){
+    shuffleDeck(game->board->deck);
+
+    // Deal two cards to the first player
+    game->players[0].card[0] = game->board->deck->cards[0];
+    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    game->players[0].card[1] = game->board->deck->cards[0];
+    RemoveFromDeck(game, &game->board->deck->cards[0]);
+
+    // Deal two cards to the dealer
+    game->board->dealerCards[0] = game->board->deck->cards[0];
+    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    game->board->dealerCards[1] = game->board->deck->cards[0];
+    RemoveFromDeck(game, &game->board->deck->cards[0]);
+}
+
+void RemoveFromDeck(Game* game, Card* card){
+    Deck* deck = game->board->deck;
+    int deckSize = 52;  // Assuming full deck initially; adjust as necessary if deck size changes
+
+    int cardIndex = -1;
+    // Find the card index in the deck
+    for (int i = 0; i < deckSize; i++) {
+        if (deck->cards[i].Suit == card->Suit && deck->cards[i].Value == card->Value) {
+            cardIndex = i;
+            break;
+        }
+    }
+
+    // If card was found, shift remaining cards left to fill the gap
+    if (cardIndex != -1) {
+        for (int i = cardIndex; i < deckSize - 1; i++) {
+            deck->cards[i] = deck->cards[i + 1];
+        }
+        deckSize--;  // Reduce the logical size of the deck
+    }
+}
+
+void InsertToDeck(Game* game, Card* card){
+    Deck* deck = game->board->deck;
+    int deckSize = 52;  // Adjust based on how many cards are in the deck
+
+    // Insert card at the end of the current deck size
+    deck->cards[deckSize] = *card;
+    deckSize++;  // Increase the logical size of the deck
+}
+
+void printCards(Card* card){
+    // Check if the card is red or black
+    if (card->Color == RED) {
+        printf(ANSI_COLOR_RED);  // Set text color to red for red cards
+    }
+
+    // Print card information in a box with regular characters
+    printf("+---------------+\n");
+    printf("| %-13s |\n", VALUE_NAMES[card->Value]);
+    printf("| %-13s |\n", SUIT_NAMES[card->Suit]);
+    printf("| Color: %-6s |\n", COLOR_NAMES[card->Color]);
+    printf("+---------------+\n");
+
+    // Reset the color for subsequent text
+    printf(ANSI_COLOR_RESET);
+}
 
 
