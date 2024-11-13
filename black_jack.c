@@ -55,6 +55,7 @@ typedef struct
     double ChipSum;
     bool isLost;
     int bet;
+    bool isTie;
 } Player;
 
 typedef struct
@@ -93,35 +94,29 @@ void freeGame(Game* game);
 void dealCards(Game* game);
 void RemoveFromDeck(Game* game,Card *card);
 void InsertToDeck(Game* game,Card *card);
-void printCards(Card* card);
+void printCard(Card* card);
 void DetermineWinner(Game* game);
 int CalculateScore(Card* card,int cardCount);
-//newest functions
 void placeBet(Player* player, double betAmmount); //This function allows a player to place a bet. It checks that the player has enough balance to place the bet.
 void acceptBets(Game* game); //This function should iterate over all players and ask them to place their bets, storing the bet amounts for each player.
 void resolveBets(Game *game); //After determining the winner, this function resolves the bets, awarding winnings to the player(s) who beat the dealer.
-
-//need to make you
 void dealerTurn(Game *game); //This function would handle the dealer's behavior, where the dealer reveals their second card and follows the rules to hit or stand.
 void playerTurn(Player* player,Game* game); //same like dealer turn, if allow the player to choose weater hit,stand . maybe add:surrender
 void startRound(Game* game); //main game loop
-
+void handleBetting(Game* game);
+void getPlayersDetails(Game* game);
+int getPlayersCount();
+void ClearConsole();
 
 int main() {
 
-    Deck deck;
-    initializeDeck(&deck);
-    shuffleDeck(&deck);
+    Game game;
+    int count = getPlayersCount();
+    initializeGame(&game,count);
 
-    Card card1 = deck.cards[0];
-    Card card2 = deck.cards[1];
+    getPlayersDetails(&game);
 
-    // Test the printCards function with both cards
-
-    printCards(&card1);
-
-
-    printCards(&card2);
+    startGame(&game);
 
     return 0;
 }
@@ -129,6 +124,7 @@ int main() {
 void initializePlayer(Player* player) {
     player->ChipSum = 250.0;
     player->isLost = false;
+    player->isTie = false;
     player->bet = 0;
     strcpy(player->name, "Default Name");  // Optional: set a default name
 }
@@ -267,7 +263,7 @@ void InsertToDeck(Game* game, Card* card) {
     deck->deckSize++;  // Increase the logical size of the deck
 }
 
-void printCards(Card* card){
+void printCard(Card* card){
     // Check if the card is red or black
     if (card->Color == RED) {
         printf(ANSI_COLOR_RED);  // Set text color to red for red cards
@@ -309,65 +305,54 @@ int calculateScore(Card* cards, int cardCount) {
 }
 
 void DetermineWinner(Game* game) {
-    int player1Score = calculateScore(game->players[0].card, 2);
-    int player2Score = calculateScore(game->players[1].card, 2);
-    int dealerScore = calculateScore(game->board->dealerCards, 2);
+    int dealerScore = calculateScore(game->board->dealerCards, 2);  // Assuming 2 dealer cards
 
-    // Output the scores
-    printf("Player 1 Score: %d\n", player1Score);
-    printf("Player 2 Score: %d\n", player2Score);
+    // Output the dealer's score
     printf("Dealer Score: %d\n", dealerScore);
 
-    // Determine if each player or dealer busts
-    bool player1Bust = (player1Score > 21);
-    bool player2Bust = (player2Score > 21);
     bool dealerBust = (dealerScore > 21);
 
-    // Determine the winner for each player individually
-    if (player1Bust) {
-        printf("Player 1 busts! ");
-    } else if (dealerBust || player1Score > dealerScore) {
-        printf("Player 1 wins against Dealer!\n");
-    } else if (player1Score == dealerScore) {
-        printf("Player 1 ties with Dealer!\n");
-    } else {
-        printf("Dealer wins against Player 1!\n");
-    }
+    // Loop through each player to calculate their scores and determine the result
+    for (int i = 0; i < game->numPlayers; i++) {
+        int playerScore = calculateScore(game->players[i].card, 2);  // Assuming 2 cards per player
 
-    if (player2Bust) {
-        printf("Player 2 busts! ");
-    } else if (dealerBust || player2Score > dealerScore) {
-        printf("Player 2 wins against Dealer!\n");
-    } else if (player2Score == dealerScore) {
-        printf("Player 2 ties with Dealer!\n");
-    } else {
-        printf("Dealer wins against Player 2!\n");
-    }
+        // Output the player's score
+        printf("%s Score: %d\n", game->players[i].name, playerScore);
 
-    // Update the status of each player if they lost
-    game->players[0].isLost = player1Bust || (!dealerBust && dealerScore > player1Score);
-    game->players[1].isLost = player2Bust || (!dealerBust && dealerScore > player2Score);
+        bool playerBust = (playerScore > 21);
+
+        // Determine the result for the player against the dealer
+        if (playerBust) {
+            printf("%s busts!\n", game->players[i].name);
+        } else if (dealerBust || playerScore > dealerScore) {
+            printf("%s wins against Dealer!\n", game->players[i].name);
+        } else if (playerScore == dealerScore) {
+            printf("%s ties with Dealer!\n", game->players[i].name);
+            game->players[i].isTie = true;
+        } else {
+            printf("Dealer wins against %s!\n", game->players[i].name);
+        }
+
+        // Update the player's lost status
+        game->players[i].isLost = playerBust || (!dealerBust && dealerScore > playerScore);
+    }
 }
 
-void placeBet(Player* player,double betAmount){
-
-    if(betAmount > player->ChipSum )
-    {
-        printf("bet is higher than you chip amount, lower the bet\n");
-    }
-    else
-    {
+void placeBet(Player* player, double betAmount) {
+    if (betAmount > player->ChipSum) {
+        printf("Bet is higher than your chip amount, lower the bet\n");
+    } else {
         player->bet = betAmount;
         player->ChipSum -= betAmount;
-        printf("Bet Placed: %d\n", betAmount);
+        printf("Bet Placed: %.2f\n", betAmount);  // Corrected format specifier for double
     }
 }
 
 void acceptBets(Game* game) {
     for (int i = 0; i < game->numPlayers; i++) {
-        int betAmount;
-        printf("Player %d, enter your bet: ", i+1);
-        scanf("%d", &betAmount);
+        double betAmount;  // Use double for betAmount to match the function signature
+        printf("Player %d, enter your bet: ", i + 1);
+        scanf("%lf", &betAmount);  // Use %lf to read a double
         placeBet(&game->players[i], betAmount);
     }
 }
@@ -380,14 +365,209 @@ void resolveBets(Game* game){
     {
         if(!game->players[i].isLost)
         {
+            if(game->players[i].isTie)
+            {
+            game->players[i].ChipSum += game->players[i].bet;
+            printf("Player %d Tie And Split Amount Of: %d",i+1, game->players[i].bet);
+            }
+            else
+            {
             game->players[i].ChipSum += 2 * game->players[i].bet;
-            printf("Player %d Wins Amount Of: %d",i+1, game->players[i].bet * 2);
+            printf("Player %d Wins Amount Of: %d ",i+1, game->players[i].bet * 2);
+
+            }
         }
         else
         {
             printf("Player %d loses their bet of %d.\n", i+1, game->players[i].bet);
         }
     }
+}
+
+void playerTurn(Player* player, Game* game) {
+    int playerScore = calculateScore(player->card, 2);
+    int cardCount = 2;
+    char choice;
+
+    printf("%s's turn:\n", player->name);
+    printf("Initial hand:\n");
+    for (int i = 0; i < cardCount; i++) {
+        printCard(&player->card[i]);
+    }
+    printf("%s's initial score: %d\n", player->name, playerScore);
+
+    // Player decides to hit, stand, or surrender
+    while (playerScore < 21) {
+        printf("Choose an action: (h)it, (s)tand, or (r)surrender: ");
+        scanf(" %c", &choice);
+
+        if (choice == 'h') {  // Hit
+            printf("%s hits.\n", player->name);
+            player->card[cardCount] = game->board->deck->cards[0];
+            RemoveFromDeck(game, &game->board->deck->cards[0]);
+            printCard(&player->card[cardCount]);
+            cardCount++;
+
+            playerScore = calculateScore(player->card, cardCount);
+            printf("%s's new score: %d\n", player->name, playerScore);
+
+        } else if (choice == 's') {  // Stand
+            printf("%s stands with a score of %d.\n", player->name, playerScore);
+            break;
+
+        } else if (choice == 'r') {  // Surrender
+            printf("%s surrenders.\n", player->name);
+            player->isLost = true;
+            player->ChipSum -= player->bet / 2;  // Lose half of the bet
+            break;
+
+        } else {
+            printf("Invalid choice. Please choose again.\n");
+        }
+    }
+
+    if (playerScore > 21) {
+        printf("%s busts with a score of %d!\n", player->name, playerScore);
+        player->isLost = true;
+    }
+}
+
+void dealerTurn(Game *game) {
+    int dealerScore = calculateScore(game->board->dealerCards, 2);
+    int cardCount = 2;
+
+    // Dealer reveals their hidden card
+    printf("Dealer's cards:\n");
+    for (int i = 0; i < cardCount; i++) {
+        printCard(&game->board->dealerCards[i]);
+    }
+    printf("Dealer's initial score: %d\n", dealerScore);
+
+    // Dealer hits until reaching at least 17
+    while (dealerScore < 17) {
+        printf("Dealer hits.\n");
+
+        // Draw a new card
+        game->board->dealerCards[cardCount] = game->board->deck->cards[0];
+        RemoveFromDeck(game, &game->board->deck->cards[0]);
+
+        printCard(&game->board->dealerCards[cardCount]);
+        cardCount++;
+
+        // Recalculate dealer's score with new card
+        dealerScore = calculateScore(game->board->dealerCards, cardCount);
+        printf("Dealer's new score: %d\n", dealerScore);
+    }
+
+    // Dealer stands if score is 17 or higher
+    if (dealerScore >= 17) {
+        printf("Dealer stands with a score of %d.\n", dealerScore);
+    }
+}
+
+void startGame(Game* game) {
+    bool gameOver = false;
+
+    while (!gameOver) {
+        // 1. Accept player bets
+        printf("Starting a new round!\n");
+        acceptBets(game);
+
+        // 2. Deal initial cards to players and dealer
+        dealCards(game);
+
+        // 3. Player turns
+        for (int i = 0; i < game->numPlayers; i++) {
+            if (!game->players[i].isLost) {
+                printf("Player %s's turn:\n", game->players[i].name);
+                playerTurn(&game->players[i], game);
+            }
+        }
+
+        // 4. Dealer turn
+        printf("Dealer's turn:\n");
+        dealerTurn(game);
+
+        // 5. Determine the winner(s)
+        DetermineWinner(game);
+
+        // 6. Resolve bets
+        resolveBets(game);
+
+        // 7. Check if players want to continue or end the game
+        printf("Do you want to play another round? (y/n): ");
+        char choice;
+        scanf(" %c", &choice);
+        if (choice == 'n' || choice == 'N') {
+            gameOver = true;
+        } else {
+            // Reset player states and game board for the next round
+            for (int i = 0; i < game->numPlayers; i++) {
+                game->players[i].bet = 0;
+                game->players[i].isLost = false;
+            }
+            initializeDeck(game->board->deck);
+            shuffleDeck(game->board->deck);
+        }
+    }
+
+    printf("Game Over! Thanks for playing.\n");
+}
+
+void handleBetting(Game *game) {
+    for (int i = 0; i < game->numPlayers; i++) {
+        int betAmount;
+        printf("%s, enter your bet amount (Balance: %d): ", game->players[i].name, game->players[i].ChipSum);
+        scanf("%d", &betAmount);
+
+        // Validate bet
+        while (betAmount <= 0 || betAmount > game->players[i].ChipSum) {
+            if (betAmount <= 0) {
+                printf("Bet must be a positive amount. Try again: ");
+            } else {
+                printf("Bet exceeds available balance. Try again: ");
+            }
+            scanf("%d", &betAmount);
+        }
+
+        // Place the bet and update balance
+        placeBet(&game->players[i], betAmount);
+        printf("%s placed a bet of %d. Remaining balance: %d\n", game->players[i].name, betAmount, game->players[i].ChipSum);
+    }
+}
+
+int getPlayersCount(){
+    int playerAmount;
+
+    printf("insert the number of players: ");
+    scanf("%d",&playerAmount);
+
+    return playerAmount;
+
+}
+
+void getPlayersDetails(Game *game) {
+    for (int i = 0; i < game->numPlayers; i++) {
+        printf("Player %d, please enter your name: ", i + 1);
+
+        // Limit input to MAX_NAME_LEN-1 to leave space for null terminator
+        if (scanf("%49s", game->players[i].name) != 1) {
+            printf("Error reading name for player %d\n", i + 1);
+            game->players[i].name[0] = '\0';  // Set an empty name in case of error
+        }
+
+        // Clear remaining input buffer in case the name was too long
+        int ch;
+        while ((ch = getchar()) != '\n' && ch != EOF) {}
+    }
+}
+
+void ClearConsole() {
+    #if defined(_WIN32)
+        system("cls"); // For Windows
+    #else
+        system("clear"); // For Linux and macOS
+    #endif
 }
 
 
