@@ -7,6 +7,8 @@
 #define MAX_NAME_LEN 50
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
+#define MAX_PLAYERS 4
+
 
 typedef enum
 {
@@ -51,17 +53,21 @@ typedef struct
     Card card[2];
     char name[MAX_NAME_LEN];
     double ChipSum;
+    bool isLost;
+    int bet;
 } Player;
 
 typedef struct
 {
     Card* cards;      // Now a pointer to a dynamically allocated array of Cards
+    int deckSize;
 } Deck;
 
 typedef struct
 {
     Deck* deck;
     Card dealerCards[2];
+    Player dealer;
     double sumBetting;
 } Board;
 
@@ -69,6 +75,7 @@ typedef struct
 {
     Player* players;  // Pointer to a dynamically allocated array of Players
     Board* board;
+    int numPlayers;
 } Game;
 
 
@@ -83,38 +90,53 @@ void initializeBoard(Board* board);
 void initializeDeck(Deck* deck);
 void shuffleDeck(Deck* deck);
 void freeGame(Game* game);
-
 void dealCards(Game* game);
 void RemoveFromDeck(Game* game,Card *card);
 void InsertToDeck(Game* game,Card *card);
-
 void printCards(Card* card);
+void DetermineWinner(Game* game);
+int CalculateScore(Card* card,int cardCount);
+//newest functions
+void placeBet(Player* player, double betAmmount); //This function allows a player to place a bet. It checks that the player has enough balance to place the bet.
+void acceptBets(Game* game); //This function should iterate over all players and ask them to place their bets, storing the bet amounts for each player.
+void resolveBets(Game *game); //After determining the winner, this function resolves the bets, awarding winnings to the player(s) who beat the dealer.
+
+//need to make you
+void dealerTurn(Game *game); //This function would handle the dealer's behavior, where the dealer reveals their second card and follows the rules to hit or stand.
+void playerTurn(Player* player,Game* game); //same like dealer turn, if allow the player to choose weater hit,stand . maybe add:surrender
+void startRound(Game* game); //main game loop
 
 
 int main() {
-    // Create and initialize a red card (Ace of Hearts)
-    Card redCard = {ACE, HEARTS, RED};
 
-    // Create and initialize a black card (King of Spades)
-    Card blackCard = {KING, SPADES, BLACK};
+    Deck deck;
+    initializeDeck(&deck);
+    shuffleDeck(&deck);
+
+    Card card1 = deck.cards[0];
+    Card card2 = deck.cards[1];
 
     // Test the printCards function with both cards
-    printf("Red Card:\n");
-    printCards(&redCard);
 
-    printf("\nBlack Card:\n");
-    printCards(&blackCard);
+    printCards(&card1);
+
+
+    printCards(&card2);
 
     return 0;
 }
 
 void initializePlayer(Player* player) {
     player->ChipSum = 250.0;
+    player->isLost = false;
+    player->bet = 0;
     strcpy(player->name, "Default Name");  // Optional: set a default name
 }
 
 void initializeDeck(Deck* deck) {
     deck->cards = malloc(52 * sizeof(Card));  // Allocate space for 52 cards
+    deck->deckSize = 52;
+
     if (deck->cards == NULL) {
         perror("Failed to allocate memory for deck cards");
         exit(EXIT_FAILURE);
@@ -153,6 +175,7 @@ void initializeGame(Game* game, int playerCount) {
     initializeBoard(game->board);  // Initialize the board
 
     game->players = malloc(playerCount * sizeof(Player));
+    game->numPlayers = playerCount;
     if (game->players == NULL) {
         perror("Failed to allocate memory for players");
         exit(EXIT_FAILURE);
@@ -215,13 +238,12 @@ void dealCards(Game* game){
     RemoveFromDeck(game, &game->board->deck->cards[0]);
 }
 
-void RemoveFromDeck(Game* game, Card* card){
+void RemoveFromDeck(Game* game, Card* card) {
     Deck* deck = game->board->deck;
-    int deckSize = 52;  // Assuming full deck initially; adjust as necessary if deck size changes
-
     int cardIndex = -1;
+
     // Find the card index in the deck
-    for (int i = 0; i < deckSize; i++) {
+    for (int i = 0; i < deck->deckSize; i++) {
         if (deck->cards[i].Suit == card->Suit && deck->cards[i].Value == card->Value) {
             cardIndex = i;
             break;
@@ -230,20 +252,19 @@ void RemoveFromDeck(Game* game, Card* card){
 
     // If card was found, shift remaining cards left to fill the gap
     if (cardIndex != -1) {
-        for (int i = cardIndex; i < deckSize - 1; i++) {
+        for (int i = cardIndex; i < deck->deckSize - 1; i++) {
             deck->cards[i] = deck->cards[i + 1];
         }
-        deckSize--;  // Reduce the logical size of the deck
+        deck->deckSize--;  // Reduce the logical size of the deck
     }
 }
 
-void InsertToDeck(Game* game, Card* card){
+void InsertToDeck(Game* game, Card* card) {
     Deck* deck = game->board->deck;
-    int deckSize = 52;  // Adjust based on how many cards are in the deck
 
     // Insert card at the end of the current deck size
-    deck->cards[deckSize] = *card;
-    deckSize++;  // Increase the logical size of the deck
+    deck->cards[deck->deckSize] = *card;
+    deck->deckSize++;  // Increase the logical size of the deck
 }
 
 void printCards(Card* card){
@@ -261,6 +282,112 @@ void printCards(Card* card){
 
     // Reset the color for subsequent text
     printf(ANSI_COLOR_RESET);
+}
+
+int calculateScore(Card* cards, int cardCount) {
+    int score = 0;
+    int aces = 0;  // Track number of Aces to adjust value as 1 or 11
+
+    for (int i = 0; i < cardCount; i++) {
+        if (cards[i].Value >= TWO && cards[i].Value <= TEN) {
+            score += cards[i].Value + 1;  // Add face value of cards (TWO is 1, etc.)
+        } else if (cards[i].Value >= JACK && cards[i].Value <= KING) {
+            score += 10;  // Face cards are worth 10 points
+        } else if (cards[i].Value == ACE) {
+            score += 11;  // Initially, count Ace as 11
+            aces++;
+        }
+    }
+
+    // Adjust score for Aces if score > 21
+    while (score > 21 && aces > 0) {
+        score -= 10;  // Reduce 11 to 1 for an Ace
+        aces--;
+    }
+
+    return score;
+}
+
+void DetermineWinner(Game* game) {
+    int player1Score = calculateScore(game->players[0].card, 2);
+    int player2Score = calculateScore(game->players[1].card, 2);
+    int dealerScore = calculateScore(game->board->dealerCards, 2);
+
+    // Output the scores
+    printf("Player 1 Score: %d\n", player1Score);
+    printf("Player 2 Score: %d\n", player2Score);
+    printf("Dealer Score: %d\n", dealerScore);
+
+    // Determine if each player or dealer busts
+    bool player1Bust = (player1Score > 21);
+    bool player2Bust = (player2Score > 21);
+    bool dealerBust = (dealerScore > 21);
+
+    // Determine the winner for each player individually
+    if (player1Bust) {
+        printf("Player 1 busts! ");
+    } else if (dealerBust || player1Score > dealerScore) {
+        printf("Player 1 wins against Dealer!\n");
+    } else if (player1Score == dealerScore) {
+        printf("Player 1 ties with Dealer!\n");
+    } else {
+        printf("Dealer wins against Player 1!\n");
+    }
+
+    if (player2Bust) {
+        printf("Player 2 busts! ");
+    } else if (dealerBust || player2Score > dealerScore) {
+        printf("Player 2 wins against Dealer!\n");
+    } else if (player2Score == dealerScore) {
+        printf("Player 2 ties with Dealer!\n");
+    } else {
+        printf("Dealer wins against Player 2!\n");
+    }
+
+    // Update the status of each player if they lost
+    game->players[0].isLost = player1Bust || (!dealerBust && dealerScore > player1Score);
+    game->players[1].isLost = player2Bust || (!dealerBust && dealerScore > player2Score);
+}
+
+void placeBet(Player* player,double betAmount){
+
+    if(betAmount > player->ChipSum )
+    {
+        printf("bet is higher than you chip amount, lower the bet\n");
+    }
+    else
+    {
+        player->bet = betAmount;
+        player->ChipSum -= betAmount;
+        printf("Bet Placed: %d\n", betAmount);
+    }
+}
+
+void acceptBets(Game* game) {
+    for (int i = 0; i < game->numPlayers; i++) {
+        int betAmount;
+        printf("Player %d, enter your bet: ", i+1);
+        scanf("%d", &betAmount);
+        placeBet(&game->players[i], betAmount);
+    }
+}
+
+void resolveBets(Game* game){
+
+    DetermineWinner(game);
+
+    for(int i=0; i<game->numPlayers; i++)
+    {
+        if(!game->players[i].isLost)
+        {
+            game->players[i].ChipSum += 2 * game->players[i].bet;
+            printf("Player %d Wins Amount Of: %d",i+1, game->players[i].bet * 2);
+        }
+        else
+        {
+            printf("Player %d loses their bet of %d.\n", i+1, game->players[i].bet);
+        }
+    }
 }
 
 
