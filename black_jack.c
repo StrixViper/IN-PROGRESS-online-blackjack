@@ -86,27 +86,48 @@ const char* SUIT_NAMES[] = {"Hearts", "Diamonds", "Spades", "Clubs"};
 const char* COLOR_NAMES[] = {"Red", "Black"};
 
 
-void initializePlayer(Player* player);
-void initializeBoard(Board* board);
-void initializeDeck(Deck* deck);
-void shuffleDeck(Deck* deck);
-void freeGame(Game* game);
-void dealCards(Game* game);
-void RemoveFromDeck(Game* game,Card *card);
-void InsertToDeck(Game* game,Card *card);
-void printCard(Card* card);
-void DetermineWinner(Game* game);
-int CalculateScore(Card* card,int cardCount);
-void placeBet(Player* player, double betAmmount); //This function allows a player to place a bet. It checks that the player has enough balance to place the bet.
-void acceptBets(Game* game); //This function should iterate over all players and ask them to place their bets, storing the bet amounts for each player.
-void resolveBets(Game *game); //After determining the winner, this function resolves the bets, awarding winnings to the player(s) who beat the dealer.
-void dealerTurn(Game *game); //This function would handle the dealer's behavior, where the dealer reveals their second card and follows the rules to hit or stand.
-void playerTurn(Player* player,Game* game); //same like dealer turn, if allow the player to choose weater hit,stand . maybe add:surrender
-void startRound(Game* game); //main game loop
-void handleBetting(Game* game);
-void getPlayersDetails(Game* game);
-int getPlayersCount();
-void ClearConsole();
+void initializePlayer(Player* player); // This function initializes a player with default values (e.g., name, chips, and other necessary attributes).
+
+void initializeBoard(Board* board);// This function initializes the game board, including setting up the dealer's cards and any other board-related data.
+
+void initializeDeck(Deck* deck); // This function initializes the deck, ensuring that all cards are available for use in the game.
+
+void shuffleDeck(Deck* deck); // This function shuffles the deck to ensure randomness before cards are dealt.
+
+void freeGame(Game* game); // This function cleans up the game resources (e.g., freeing allocated memory for players, deck, etc.) when the game ends.
+
+void dealCards(Game* game); // This function deals cards to all players and the dealer at the start of a round.
+
+void RemoveFromDeck(Game* game, Card* card); // This function removes a specific card from the deck after it has been dealt to a player or dealer.
+
+void InsertToDeck(Game* game, Card* card); // This function inserts a card back into the deck (useful when reshuffling or returning cards to the deck).
+
+void printCard(Card* card); // This function prints out the details of a single card (e.g., the card's rank and suit).
+
+void DetermineWinner(Game* game); // This function determines the winner of the round by comparing the scores of all players and the dealer. It will announce the result accordingly.
+
+int CalculateScore(Card* card, int cardCount); // This function calculates the score of a hand, based on the cards in the hand. It sums up the values of the cards.
+
+void placeBet(Player* player, double betAmount); // This function allows a player to place a bet. It checks that the player has enough balance to place the bet.
+
+void acceptBets(Game* game); // This function iterates over all players and asks them to place their bets, storing the bet amounts for each player.
+
+void resolveBets(Game* game); // After determining the winner, this function resolves the bets, awarding winnings to the player(s) who beat the dealer.
+
+void dealerTurn(Game* game); // This function handles the dealer's behavior, where the dealer reveals their second card and follows the rules to hit or stand.
+
+void playerTurn(Player* player, Game* game); // This function handles the player's turn, allowing them to choose whether to hit, stand, or even surrender.
+
+void startRound(Game* game); // This is the main game loop for a round, coordinating the sequence of actions from dealing cards to determining the winner.
+
+void handleBetting(Game* game); // This function manages the betting phase, allowing each player to place their bets before the cards are dealt.
+
+void getPlayersDetails(Game* game); // This function asks players for their details (e.g., name), which are then stored in the game structure.
+
+int getPlayersCount(); // This function asks the user how many players are participating in the game and returns the number of players.
+
+void ClearConsole(); // This function clears the console screen, often used to refresh the display during gameplay.
+
 
 int main() {
 
