@@ -8,7 +8,7 @@
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 #define MAX_PLAYERS 4
-
+#define MAX_CARDS 50
 
 typedef enum
 {
@@ -50,12 +50,13 @@ typedef struct
 
 typedef struct
 {
-    Card card[2];
+    Card card[MAX_CARDS];
     char name[MAX_NAME_LEN];
     double ChipSum;
     bool isLost;
     int bet;
     bool isTie;
+    int countCard;
 } Player;
 
 typedef struct
@@ -67,7 +68,8 @@ typedef struct
 typedef struct
 {
     Deck* deck;
-    Card dealerCards[2];
+    Card dealerCards[3];
+    int dealCardCount;
     Player dealer;
     double sumBetting;
 } Board;
@@ -78,6 +80,12 @@ typedef struct
     Board* board;
     int numPlayers;
 } Game;
+
+//##########----- STRUCTS FOR THE HISTORY MOVES -----################
+
+
+
+//####################################################################
 
 
 // Map values and suits to their string representations
@@ -128,18 +136,20 @@ int getPlayersCount(); // This function asks the user how many players are parti
 
 void ClearConsole(); // This function clears the console screen, often used to refresh the display during gameplay.
 
+void PrintBalance(Player* player); // This function print the chip sum of a player
+
+void printRules(); // This function print the rules of the game
+
+void displayMenu(); //This function display the menu for the game
 
 int main() {
-
-    Game game;
-    int count = getPlayersCount();
-    initializeGame(&game,count);
-
-    getPlayersDetails(&game);
-
-    startGame(&game);
-
+    displayMenu();
     return 0;
+}
+
+
+void PrintBalance(Player* player) {
+    printf("%s Balance: %.2f\n", player->name, player->ChipSum); // Add 'player->name' for the name
 }
 
 void initializePlayer(Player* player) {
@@ -147,6 +157,7 @@ void initializePlayer(Player* player) {
     player->isLost = false;
     player->isTie = false;
     player->bet = 0;
+    player->countCard = 2;
     strcpy(player->name, "Default Name");  // Optional: set a default name
 }
 
@@ -181,6 +192,7 @@ void initializeBoard(Board* board) {
     initializeDeck(board->deck);  // Initialize the deck within the board
 
     board->sumBetting = 0.0;  // Initialize the betting sum to zero
+    board->dealCardCount = 2;
 }
 
 void initializeGame(Game* game, int playerCount) {
@@ -239,20 +251,23 @@ void freeGame(Game* game) {
     }
 }
 
-void dealCards(Game* game){
+void dealCards(Game* game) {
+    // Shuffle the deck before dealing
     shuffleDeck(game->board->deck);
 
-    // Deal two cards to the first player
-    game->players[0].card[0] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
-    game->players[0].card[1] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    // Deal two cards to each player
+    for (int i = 0; i < game->numPlayers; i++) {
+        for (int j = 0; j < 2; j++) {
+            game->players[i].card[j] = game->board->deck->cards[0];
+            RemoveFromDeck(game, &game->board->deck->cards[0]);
+        }
+    }
 
     // Deal two cards to the dealer
-    game->board->dealerCards[0] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
-    game->board->dealerCards[1] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    for (int j = 0; j < 2; j++) {
+        game->board->dealerCards[j] = game->board->deck->cards[0];
+        RemoveFromDeck(game, &game->board->deck->cards[0]);
+    }
 }
 
 void RemoveFromDeck(Game* game, Card* card) {
@@ -326,18 +341,23 @@ int calculateScore(Card* cards, int cardCount) {
 }
 
 void DetermineWinner(Game* game) {
-    int dealerScore = calculateScore(game->board->dealerCards, 2);  // Assuming 2 dealer cards
 
-    // Output the dealer's score
+    int dealerScore = calculateScore(game->board->dealerCards, game->board->dealCardCount);  // Using dealer's actual card count
     printf("Dealer Score: %d\n", dealerScore);
 
     bool dealerBust = (dealerScore > 21);
 
+    if(dealerScore > 21)
+        {
+            printf("Dealer Busts!!! \n");
+        }
+
     // Loop through each player to calculate their scores and determine the result
     for (int i = 0; i < game->numPlayers; i++) {
-        int playerScore = calculateScore(game->players[i].card, 2);  // Assuming 2 cards per player
 
-        // Output the player's score
+        // Use the actual card count for each player
+        int playerScore = calculateScore(game->players[i].card, game->players[i].countCard);
+
         printf("%s Score: %d\n", game->players[i].name, playerScore);
 
         bool playerBust = (playerScore > 21);
@@ -360,27 +380,38 @@ void DetermineWinner(Game* game) {
 }
 
 void placeBet(Player* player, double betAmount) {
-    if (betAmount > player->ChipSum) {
-        printf("Bet is higher than your chip amount, lower the bet\n");
-    } else {
-        player->bet = betAmount;
-        player->ChipSum -= betAmount;
-        printf("Bet Placed: %.2f\n", betAmount);  // Corrected format specifier for double
-    }
+    player->bet = betAmount;
+    player->ChipSum -= betAmount;
 }
 
 void acceptBets(Game* game) {
     for (int i = 0; i < game->numPlayers; i++) {
-        double betAmount;  // Use double for betAmount to match the function signature
+        double betAmount;
+
+        printf("%s Balance: %.2f\n",game->players[i].name,game->players[i].ChipSum);
+
+        // Continuously ask for a valid bet
         printf("Player %d, enter your bet: ", i + 1);
-        scanf("%lf", &betAmount);  // Use %lf to read a double
+        scanf("%lf", &betAmount);
+
+        while (betAmount > game->players[i].ChipSum || betAmount <= 0) {
+            if (betAmount > game->players[i].ChipSum) {
+                printf("Bet is higher than your chip amount, lower the bet.\n");
+            } else if (betAmount <= 0) {
+                printf("Bet must be greater than zero.\n");
+            }
+            printf("Player %d, enter your bet: ", i + 1);
+            scanf("%lf", &betAmount);
+        }
+
         placeBet(&game->players[i], betAmount);
+        printf("Bet Placed: %.2f\n", betAmount);
+        printf("Balance Left After The Bet: %.2f \n",game->players[i].ChipSum);
     }
 }
 
 void resolveBets(Game* game){
 
-    DetermineWinner(game);
 
     for(int i=0; i<game->numPlayers; i++)
     {
@@ -389,30 +420,33 @@ void resolveBets(Game* game){
             if(game->players[i].isTie)
             {
             game->players[i].ChipSum += game->players[i].bet;
-            printf("Player %d Tie And Split Amount Of: %d",i+1, game->players[i].bet);
+            printf("Player %s Tie And Split Amount Of: %d \n",game->players[i].name, game->players[i].bet);
+
             }
             else
             {
             game->players[i].ChipSum += 2 * game->players[i].bet;
-            printf("Player %d Wins Amount Of: %d ",i+1, game->players[i].bet * 2);
+            printf("Player %s Wins Amount Of: %d \n",game->players[i].name, game->players[i].bet * 2);
 
             }
         }
         else
         {
-            printf("Player %d loses their bet of %d.\n", i+1, game->players[i].bet);
+            printf("Player %s loses their bet of %d.\n", game->players[i].name, game->players[i].bet);
         }
+        PrintBalance(&game->players[i]);
     }
 }
 
 void playerTurn(Player* player, Game* game) {
-    int playerScore = calculateScore(player->card, 2);
-    int cardCount = 2;
+    // Initialize player score with the initial card count (assumed to be 2)
+
+    int playerScore = calculateScore(player->card, player->countCard);
     char choice;
 
     printf("%s's turn:\n", player->name);
     printf("Initial hand:\n");
-    for (int i = 0; i < cardCount; i++) {
+    for (int i = 0; i < player->countCard; i++) {
         printCard(&player->card[i]);
     }
     printf("%s's initial score: %d\n", player->name, playerScore);
@@ -424,13 +458,15 @@ void playerTurn(Player* player, Game* game) {
 
         if (choice == 'h') {  // Hit
             printf("%s hits.\n", player->name);
-            player->card[cardCount] = game->board->deck->cards[0];
-            RemoveFromDeck(game, &game->board->deck->cards[0]);
-            printCard(&player->card[cardCount]);
-            cardCount++;
-
-            playerScore = calculateScore(player->card, cardCount);
+            player->card[player->countCard] = game->board->deck->cards[0];  // Add a new card
+            RemoveFromDeck(game, &game->board->deck->cards[0]);             // Remove that card from the deck
+            printCard(&player->card[player->countCard]);
+            player->countCard++;  // Increment countCard to reflect new card
+            playerScore = calculateScore(player->card, player->countCard);  // Update player score with new card count
             printf("%s's new score: %d\n", player->name, playerScore);
+
+            // Debugging output
+            printf("player card count: %d\n", player->countCard);
 
         } else if (choice == 's') {  // Stand
             printf("%s stands with a score of %d.\n", player->name, playerScore);
@@ -467,7 +503,7 @@ void dealerTurn(Game *game) {
     // Dealer hits until reaching at least 17
     while (dealerScore < 17) {
         printf("Dealer hits.\n");
-
+        game->board->dealCardCount = 3;
         // Draw a new card
         game->board->dealerCards[cardCount] = game->board->deck->cards[0];
         RemoveFromDeck(game, &game->board->deck->cards[0]);
@@ -477,12 +513,19 @@ void dealerTurn(Game *game) {
 
         // Recalculate dealer's score with new card
         dealerScore = calculateScore(game->board->dealerCards, cardCount);
-        printf("Dealer's new score: %d\n", dealerScore);
+        if(dealerScore<=21)
+            {
+                printf("Dealer's new score: %d\n", dealerScore);
+            }
     }
 
     // Dealer stands if score is 17 or higher
     if (dealerScore >= 17) {
-        printf("Dealer stands with a score of %d.\n", dealerScore);
+        int dealerScoreAfter = calculateScore(game->board->dealerCards, cardCount);
+            if(dealerScore<=21)
+                {
+                    printf("Dealer stands with a score of %d.\n", dealerScore);
+                }
     }
 }
 
@@ -490,6 +533,7 @@ void startGame(Game* game) {
     bool gameOver = false;
 
     while (!gameOver) {
+        ClearConsole();
         // 1. Accept player bets
         printf("Starting a new round!\n");
         acceptBets(game);
@@ -500,7 +544,6 @@ void startGame(Game* game) {
         // 3. Player turns
         for (int i = 0; i < game->numPlayers; i++) {
             if (!game->players[i].isLost) {
-                printf("Player %s's turn:\n", game->players[i].name);
                 playerTurn(&game->players[i], game);
             }
         }
@@ -589,6 +632,53 @@ void ClearConsole() {
     #else
         system("clear"); // For Linux and macOS
     #endif
+}
+
+void printRules() {
+    printf("\n****** BLACKJACK GAME RULES ******\n");
+    printf("1. The game is played with one or more decks of 52 cards.\n");
+    printf("2. The goal is to get as close to 21 points as possible, without exceeding 21.\n");
+    printf("3. Number cards (2-10) are worth their face value.\n");
+    printf("4. Face cards (Jack, Queen, King) are each worth 10 points.\n");
+    printf("5. Aces can be worth 1 or 11 points, whichever is more beneficial.\n");
+    printf("6. Players are dealt two cards, and the dealer is dealt one card face up.\n");
+    printf("7. Players can 'Hit' to take another card or 'Stand' to hold their total.\n");
+    printf("8. Players who exceed 21 points lose automatically (bust).\n");
+    printf("9. If the player's total is higher than the dealer's without busting, they win.\n");
+    printf("10. If the dealer has a higher total, the dealer wins.\n");
+    printf("*************************************\n\n");
+}
+
+void displayMenu() {
+    int choice;
+    int count;
+    Game game;
+
+    while (1) {
+        // Stylish menu display
+        printf("\n\n********** BLACKJACK GAME **********\n");
+        printf("* 1. Start a New Game             *\n");
+        printf("* 2. View Game Rules              *\n");
+        printf("************************************\n");
+        printf("Please choose an option (1 or 2): ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                ClearConsole();
+                count = getPlayersCount();
+                initializeGame(&game,count);
+                getPlayersDetails(&game);
+                startGame(&game);
+               break;
+            case 2:
+                ClearConsole();
+                printRules();
+                break;
+            default:
+                printf("\nInvalid choice. Please try again.\n");
+        }
+    }
 }
 
 
