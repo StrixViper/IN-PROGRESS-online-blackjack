@@ -243,20 +243,23 @@ void freeGame(Game* game) {
     }
 }
 
-void dealCards(Game* game){
+void dealCards(Game* game) {
+    // Shuffle the deck before dealing
     shuffleDeck(game->board->deck);
 
-    // Deal two cards to the first player
-    game->players[0].card[0] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
-    game->players[0].card[1] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    // Deal two cards to each player
+    for (int i = 0; i < game->numPlayers; i++) {
+        for (int j = 0; j < 2; j++) {
+            game->players[i].card[j] = game->board->deck->cards[0];
+            RemoveFromDeck(game, &game->board->deck->cards[0]);
+        }
+    }
 
     // Deal two cards to the dealer
-    game->board->dealerCards[0] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
-    game->board->dealerCards[1] = game->board->deck->cards[0];
-    RemoveFromDeck(game, &game->board->deck->cards[0]);
+    for (int j = 0; j < 2; j++) {
+        game->board->dealerCards[j] = game->board->deck->cards[0];
+        RemoveFromDeck(game, &game->board->deck->cards[0]);
+    }
 }
 
 void RemoveFromDeck(Game* game, Card* card) {
@@ -336,6 +339,11 @@ void DetermineWinner(Game* game) {
 
     bool dealerBust = (dealerScore > 21);
 
+    if(dealerScore > 21)
+        {
+            printf("Dealer Busts!!! \n");
+        }
+
     // Loop through each player to calculate their scores and determine the result
     for (int i = 0; i < game->numPlayers; i++) {
 
@@ -392,25 +400,25 @@ void resolveBets(Game* game){
             if(game->players[i].isTie)
             {
             game->players[i].ChipSum += game->players[i].bet;
-            printf("Player %d Tie And Split Amount Of: %d \n",i+1, game->players[i].bet);
+            printf("Player %s Tie And Split Amount Of: %d \n",game->players[i].name, game->players[i].bet);
             }
             else
             {
             game->players[i].ChipSum += 2 * game->players[i].bet;
-            printf("Player %d Wins Amount Of: %d \n",i+1, game->players[i].bet * 2);
+            printf("Player %s Wins Amount Of: %d \n",game->players[i].name, game->players[i].bet * 2);
 
             }
         }
         else
         {
-            printf("Player %d loses their bet of %d.\n", i+1, game->players[i].bet);
+            printf("Player %s loses their bet of %d.\n", game->players[i].name, game->players[i].bet);
         }
     }
 }
 
 void playerTurn(Player* player, Game* game) {
     // Initialize player score with the initial card count (assumed to be 2)
-    player->countCard = 2;  // Set initial count of cards to 2
+
     int playerScore = calculateScore(player->card, player->countCard);
     char choice;
 
@@ -459,7 +467,6 @@ void playerTurn(Player* player, Game* game) {
     }
 }
 
-
 void dealerTurn(Game *game) {
     int dealerScore = calculateScore(game->board->dealerCards, 2);
     int cardCount = 2;
@@ -484,12 +491,19 @@ void dealerTurn(Game *game) {
 
         // Recalculate dealer's score with new card
         dealerScore = calculateScore(game->board->dealerCards, cardCount);
-        printf("Dealer's new score: %d\n", dealerScore);
+        if(dealerScore<=21)
+            {
+                printf("Dealer's new score: %d\n", dealerScore);
+            }
     }
 
     // Dealer stands if score is 17 or higher
     if (dealerScore >= 17) {
-        printf("Dealer stands with a score of %d.\n", dealerScore);
+        int dealerScoreAfter = calculateScore(game->board->dealerCards, cardCount);
+            if(dealerScore<=21)
+                {
+                    printf("Dealer stands with a score of %d.\n", dealerScore);
+                }
     }
 }
 
