@@ -3,12 +3,15 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+#include <unistd.h>
+
 
 #define MAX_NAME_LEN 50
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 #define MAX_PLAYERS 4
 #define MAX_CARDS 50
+#define MAX_ROUNDS 20
 
 typedef enum
 {
@@ -83,7 +86,27 @@ typedef struct
 
 //##########----- STRUCTS FOR THE HISTORY MOVES -----################
 
+typedef enum
+{
+    HIT,
+    STAND,
+    SURRENDER
+}Decision;
 
+typedef struct {
+    int roundNumber;
+    Decision playerActions[MAX_PLAYERS][100];  // To hold actions like "Hit" or "Stand"
+    int playerScores[MAX_PLAYERS];          // Scores of players at the end of each round
+    bool playerWins[MAX_PLAYERS];           // Whether the player won this round
+    bool playerTied[MAX_PLAYERS];           // Whether the player tied with the dealer
+    bool playerLost[MAX_PLAYERS];           // Whether the player lost with the dealer
+    double playerBalanceChange[MAX_PLAYERS]; // Change in balance after the round
+
+} Move;
+
+void StoreMove(Move* move);
+
+Move movesDB[MAX_ROUNDS];
 
 //####################################################################
 
@@ -93,6 +116,10 @@ const char* VALUE_NAMES[] = {"Ace", "Two", "Three", "Four", "Five", "Six", "Seve
 const char* SUIT_NAMES[] = {"Hearts", "Diamonds", "Spades", "Clubs"};
 const char* COLOR_NAMES[] = {"Red", "Black"};
 
+
+printCardLogo(); // This function print the starting of the game
+
+void showLoadingProgress(); // This is a stylish function to print a progress bar
 
 void initializePlayer(Player* player); // This function initializes a player with default values (e.g., name, chips, and other necessary attributes).
 
@@ -142,11 +169,15 @@ void printRules(); // This function print the rules of the game
 
 void displayMenu(); //This function display the menu for the game
 
+void initializeRoundReport(Move* move); // This function initializes the round report
+
+void sleep_in_seconds(int seconds); // This function sleep in a requested seconds. for any OS
+
+
 int main() {
     displayMenu();
     return 0;
 }
-
 
 void PrintBalance(Player* player) {
     printf("%s Balance: %.2f\n", player->name, player->ChipSum); // Add 'player->name' for the name
@@ -575,6 +606,7 @@ void startGame(Game* game) {
         }
     }
 
+
     printf("Game Over! Thanks for playing.\n");
 }
 
@@ -634,6 +666,17 @@ void ClearConsole() {
     #endif
 }
 
+void sleep_in_seconds(int seconds) {
+    #ifdef _WIN32
+        Sleep(seconds * 1000);  // Sleep expects milliseconds on Windows
+    #elif __linux__ || __APPLE__
+        sleep(seconds);         // Sleep expects seconds on Linux/macOS
+    #else
+        printf("Unsupported OS\n");
+    #endif
+}
+
+
 void printRules() {
     printf("\n****** BLACKJACK GAME RULES ******\n");
     printf("1. The game is played with one or more decks of 52 cards.\n");
@@ -654,13 +697,53 @@ void displayMenu() {
     int count;
     Game game;
 
+
+    void printCardLogo() {
+    printf("\n");
+    printf("  \t\t\t\t\t==========================================\n");
+    printf("  \t\t\t\t\t||              BLACKJACK              ||\n");
+    printf("  \t\t\t\t\t==========================================\n");
+    printf("  \t\t\t\t\t||                                      ||\n");
+    printf("  \t\t\t\t\t||   ______     ______     ______       ||\n");
+    printf("  \t\t\t\t\t||  |A     |   |K     |   |10    |      ||\n");
+    printf("  \t\t\t\t\t||  |      |   |      |   |      |      ||\n");
+    printf("  \t\t\t\t\t||  |     A|   |     K|   |    10|      ||\n");
+    printf("  \t\t\t\t\t||  |______|   |______|   |______|      ||\n");
+    printf("  \t\t\t\t\t||                                      ||\n");
+    printf("  \t\t\t\t\t||         WELCOME TO BLACKJACK         ||\n");
+    printf("  \t\t\t\t\t==========================================\n");
+    printf("\n");
+}
+
+    printCardLogo();
+
+    printf("  \t\t\t\t\t==========================================\n");
+    printf("  \t\t\t\t\t||           LOADING THE GAME           ||\n");
+    printf("  \t\t\t\t\t==========================================\n");
+
+
+    void showLoadingProgress() {
+    int progressWidth = 30;
+    printf("\n\t\t\t\t\tLoading: [");
+    for (int i = 0; i < progressWidth; i++) {
+        printf("#");
+        fflush(stdout);
+        Sleep(3000 / progressWidth); // 3 seconds divided by total steps
+    }
+    printf("]\n");
+}
+
+    showLoadingProgress();
+    sleep_in_seconds(2);
+
+    ClearConsole();
     while (1) {
         // Stylish menu display
-        printf("\n\n********** BLACKJACK GAME **********\n");
-        printf("* 1. Start a New Game             *\n");
-        printf("* 2. View Game Rules              *\n");
-        printf("************************************\n");
-        printf("Please choose an option (1 or 2): ");
+        printf("\n\n\t\t\t\t\t********** BLACKJACK GAME **********\n");
+        printf("\t\t\t\t\t* 1. Start a New Game              *\n");
+        printf("\t\t\t\t\t* 2. View Game Rules               *\n");
+        printf("\t\t\t\t\t************************************\n");
+        printf("\t\t\t\t\tPlease choose an option (1 or 2): ");
         scanf("%d", &choice);
 
         switch (choice) {
